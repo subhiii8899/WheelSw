@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "105224990773",
+    "project_id": "wheelswap-6f323",
+    "storage_bucket": "wheelswap-6f323.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:105224990773:android:53c9715f881c46e122417c",
+        "android_client_info": {
+          "package_name": "com.example.wheelswap"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "105224990773-uaah4t32t4d29rjugcr0ukkr6da257fn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.wheelswap",
+            "certificate_hash": "6f319992b03c79c8d52b2f9ef79dcbaf7b3ebce8"
+          }
+        },
+        {
+          "client_id": "105224990773-ppvukcllbb2pouofp5fclfe0fe610c7t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBnqcC5T9raymsfHF_SnbtBccWpDyjAc5w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "105224990773-ppvukcllbb2pouofp5fclfe0fe610c7t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
