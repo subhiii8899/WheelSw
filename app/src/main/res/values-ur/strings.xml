@@ -11,7 +11,10 @@
     <string name="payment_title">ادائیگی کا طریقہ منتخب کریں</string>
     <string name="payment_subtitle">پریمیم ویزیبلٹی کے لیے محفوظ ادائیگی</string>
     <string name="pay_now">ابھی ادائیگی کریں</string>
-    <string name="payment_success">ادائیگی کامیاب! آپ کا اشتہار اب لائیو ہے۔</string>
+    <string name="payment_success">ادائیگی شروع ہو گئی ہے! براہ کرم تصدیق کے لیے رسید اپ لوڈ کریں۔</string>
+    <string name="upload_receipt">ادائیگی کی رسید اپ لوڈ کریں</string>
+    <string name="receipt_required">آگے بڑھنے کے لیے براہ کرم ادائیگی کی رسید اپ لوڈ کریں۔</string>
+    <string name="payment_instructions">رقم بھیجیں: \n0328-6029100\nپھر نیچے اسکرین شاٹ اپ لوڈ کریں۔</string>
     <string name="jazzcash">جاز کیش / ایزی پیسہ</string>
     <string name="bank_card">کریڈٹ/ڈیبٹ کارڈ</string>
     <string name="free_limit_reached">ویو کی حد ختم (مفت اشتہار)</string>

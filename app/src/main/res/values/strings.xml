@@ -12,7 +12,10 @@
     <string name="payment_title">Select Payment Method</string>
     <string name="payment_subtitle">Secure payment for premium visibility</string>
     <string name="pay_now">Pay Now</string>
-    <string name="payment_success">Payment Successful! Your ad is now live.</string>
+    <string name="payment_success">Payment initiated! Please upload the receipt for verification.</string>
+    <string name="upload_receipt">Upload Payment Receipt</string>
+    <string name="receipt_required">Please upload the payment receipt to proceed.</string>
+    <string name="payment_instructions">Send payment to: \n0328-6029100\nThen upload the screenshot below.</string>
     <string name="jazzcash">JazzCash / EasyPaisa</string>
     <string name="bank_card">Credit/Debit Card</string>
     <string name="free_limit_reached">View limit reached (Free Ad)</string>

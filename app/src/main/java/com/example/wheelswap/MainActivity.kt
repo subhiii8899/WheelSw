@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -77,6 +79,7 @@ data class Vehicle(
     val fuelType: String = "",
     val views: Int = 0,
     val isPaid: Boolean = false,
+    val isVerified: Boolean = false,
     val sellerName: String = "",
     val sellerProfilePic: String = "",
     val imageUrls: List<String> = emptyList(),
@@ -149,7 +152,56 @@ fun HomeScreen() {
     var isRefreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    var hasUnreadMessages by remember { mutableStateOf(false) }
+
+    // Listen for global unread messages
+    LaunchedEffect(auth?.currentUser?.uid) {
+        val uid = auth?.currentUser?.uid
+        if (uid != null) {
+            db?.collection("chats")
+                ?.whereArrayContains("users", uid)
+                ?.addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null) {
+                        var foundUnread = false
+                        var checkCount = 0
+                        val totalRooms = snapshot.documents.size
+                        
+                        if (totalRooms == 0) hasUnreadMessages = false
+                        
+                        snapshot.documents.forEach { roomDoc ->
+                            db.collection("chats").document(roomDoc.id).collection("messages")
+                                .whereEqualTo("status", "sent")
+                                .get()
+                                .addOnSuccessListener { msgSnapshot ->
+                                    if (msgSnapshot.documents.any { it.getString("senderId") != uid }) {
+                                        foundUnread = true
+                                    }
+                                    checkCount++
+                                    if (checkCount == totalRooms || foundUnread) {
+                                        hasUnreadMessages = foundUnread
+                                    }
+                                }
+                        }
+                    }
+                }
+        }
+    }
+
+    var savedListingIds by remember { mutableStateOf(setOf<String>()) }
     var currentUserProfilePic by remember { mutableStateOf<String?>(null) }
+
+    // Fetch Saved Listings
+    LaunchedEffect(auth?.currentUser?.uid) {
+        val uid = auth?.currentUser?.uid
+        if (uid != null) {
+            db?.collection("users")?.document(uid)?.collection("saved")
+                ?.addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null) {
+                        savedListingIds = snapshot.documents.map { it.id }.toSet()
+                    }
+                }
+        }
+    }
 
     // Fetch Current User Details
     LaunchedEffect(auth?.currentUser?.uid) {
@@ -209,6 +261,7 @@ fun HomeScreen() {
                             fuelType = doc.getString("fuelType") ?: (if (vehicleType == "Car") "Petrol" else ""),
                             views = doc.getLong("views")?.toInt() ?: 0,
                             isPaid = doc.getBoolean("isPaid") ?: false,
+                            isVerified = doc.getBoolean("isVerified") ?: false,
                             sellerName = doc.getString("sellerName") ?: "User",
                             sellerProfilePic = doc.getString("sellerProfilePic") ?: "",
                             imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList(),
@@ -222,7 +275,11 @@ fun HomeScreen() {
     }
 
     val filtered = dynamicVehicleList.filter {
-        val matchesTab = if (selectedTab == 1) it.userId == auth?.currentUser?.uid else true
+        val matchesTab = when (selectedTab) {
+            1 -> it.userId == auth?.currentUser?.uid
+            2 -> savedListingIds.contains(it.id)
+            else -> true
+        }
         
         // Location Filter Logic
         val matchesLocation = if (citySearchQuery.isEmpty() || citySearchQuery.lowercase() == "all pakistan") {
@@ -276,23 +333,34 @@ fun HomeScreen() {
                 actions = {
                     Box {
                         IconButton(onClick = { showProfileMenu = true }) {
-                            if (!currentUserProfilePic.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = currentUserProfilePic,
-                                    contentDescription = stringResource(R.string.profile),
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .border(1.dp, Gold, CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.AccountCircle,
-                                    contentDescription = stringResource(R.string.profile),
-                                    tint = Gold,
-                                    modifier = Modifier.size(32.dp)
-                                )
+                            Box {
+                                if (!currentUserProfilePic.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = currentUserProfilePic,
+                                        contentDescription = stringResource(R.string.profile),
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .border(1.dp, Gold, CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.AccountCircle,
+                                        contentDescription = stringResource(R.string.profile),
+                                        tint = Gold,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                                
+                                if (hasUnreadMessages) {
+                                    Surface(
+                                        modifier = Modifier.size(10.dp).align(Alignment.TopEnd),
+                                        color = Color.Red,
+                                        shape = CircleShape,
+                                        border = androidx.compose.foundation.BorderStroke(1.5.dp, DarkBg)
+                                    ) {}
+                                }
                             }
                         }
                         DropdownMenu(
@@ -326,6 +394,20 @@ fun HomeScreen() {
                                 onClick = {
                                     showProfileMenu = false
                                     context.startActivity(Intent(context, FeedbackActivity::class.java))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Swap Proposals 🔄", color = Color.White) },
+                                onClick = {
+                                    showProfileMenu = false
+                                    context.startActivity(Intent(context, ProposalsActivity::class.java))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Messages 💬", color = Color.White) },
+                                onClick = {
+                                    showProfileMenu = false
+                                    context.startActivity(Intent(context, ConversationsActivity::class.java))
                                 }
                             )
                             DropdownMenuItem(
@@ -379,6 +461,19 @@ fun HomeScreen() {
                     onClick = { selectedTab = 1 },
                     icon = { Icon(Icons.Default.List, contentDescription = null) },
                     label = { Text(stringResource(R.string.my_inventory)) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = DarkBg,
+                        selectedTextColor = Gold,
+                        indicatorColor = Gold,
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray
+                    )
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = { Icon(if (selectedTab == 2) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = null) },
+                    label = { Text("Saved") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = DarkBg,
                         selectedTextColor = Gold,
@@ -527,9 +622,18 @@ fun HomeScreen() {
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(filtered) { vehicle ->
+                            val isSaved = savedListingIds.contains(vehicle.id)
                             VehicleCard(
                                 vehicle = vehicle,
                                 isOwner = vehicle.userId == auth?.currentUser?.uid,
+                                isSaved = isSaved,
+                                onToggleSave = {
+                                    val uid = auth?.currentUser?.uid
+                                    if (uid != null) {
+                                        val ref = db?.collection("users")?.document(uid)?.collection("saved")?.document(vehicle.id)
+                                        if (isSaved) ref?.delete() else ref?.set(mapOf("timestamp" to System.currentTimeMillis()))
+                                    }
+                                },
                                 onDelete = {
                                     db?.collection("listings")?.document(vehicle.id)?.delete()
                                 },
@@ -570,6 +674,8 @@ fun HomeScreen() {
                                         putExtra("modifications", vehicle.modifications)
                                         putExtra("sellerName", vehicle.sellerName)
                                         putExtra("sellerProfilePic", vehicle.sellerProfilePic)
+                                        putExtra("sellerId", vehicle.userId)
+                                        putExtra("isVerified", vehicle.isVerified)
                                         putStringArrayListExtra("imageUrls", ArrayList(vehicle.imageUrls))
                                     }
                                     context.startActivity(intent)
@@ -587,6 +693,8 @@ fun HomeScreen() {
 fun VehicleCard(
     vehicle: Vehicle,
     isOwner: Boolean,
+    isSaved: Boolean,
+    onToggleSave: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
     onClick: () -> Unit
@@ -656,6 +764,21 @@ fun VehicleCard(
                                 }
                             )
                         }
+                    }
+                } else {
+                    // Save Button for others
+                    IconButton(
+                        onClick = onToggleSave,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = if (isSaved) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Save",
+                            tint = if (isSaved) Color.Red else Color.White
+                        )
                     }
                 }
 

@@ -1,13 +1,16 @@
 package com.example.wheelswap
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -58,6 +61,7 @@ class SellActivity : ComponentActivity() {
 
         setContent {
             SellScreen(
+                activity = this,
                 isEdit = isEdit,
                 vehicleId = vehicleId,
                 initialName = intent.getStringExtra("name") ?: "",
@@ -79,6 +83,7 @@ class SellActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SellScreen(
+    activity: ComponentActivity,
     isEdit: Boolean,
     vehicleId: String,
     initialName: String,
@@ -111,6 +116,7 @@ fun SellScreen(
     var selectedDuration by rememberSaveable { mutableStateOf("7 Days") }
     var isDurationMenuExpanded by remember { mutableStateOf(false) }
     var showPaymentSheet by rememberSaveable { mutableStateOf(false) }
+    var receiptUri by remember { mutableStateOf<Uri?>(null) }
 
     var remoteImages by remember { mutableStateOf(initialImageUrls) }
     var selectedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -164,6 +170,29 @@ fun SellScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // NEW: Vehicle Type at the top
+            Text("Select your vehicle type", color = Gold, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                listOf("Car", "Bike").forEach { item ->
+                    val isSelected = type == item
+                    Button(
+                        onClick = { type = item },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected) Gold else CardBg
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(item, color = if (isSelected) DarkBg else Gold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Text("Photos (Up to 3)", color = Color.Gray, modifier = Modifier.fillMaxWidth())
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -339,25 +368,6 @@ fun SellScreen(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                listOf("Car", "Bike").forEach { item ->
-                    val isSelected = type == item
-                    Button(
-                        onClick = { type = item },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isSelected) Gold else CardBg
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(item, color = if (isSelected) DarkBg else Gold)
-                    }
-                }
-            }
-
             Spacer(modifier = Modifier.height(20.dp))
 
             Button(
@@ -385,6 +395,7 @@ fun SellScreen(
 
     if (showPaymentSheet) {
         var selectedMethod by remember { mutableStateOf("JazzCash") }
+        val receiptLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { receiptUri = it }
         
         ModalBottomSheet(
             onDismissRequest = { showPaymentSheet = false },
@@ -392,38 +403,113 @@ fun SellScreen(
             dragHandle = { BottomSheetDefaults.DragHandle(color = Color.Gray) }
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp),
+                modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 32.dp).verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(stringResource(R.string.payment_title), color = Gold, fontSize = 22.sp, fontWeight = FontWeight.Black)
                 Text(stringResource(R.string.payment_subtitle), color = Color.Gray, fontSize = 14.sp)
+                
                 Spacer(modifier = Modifier.height(24.dp))
                 
+                Text(stringResource(R.string.payment_instructions), color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                
+                Spacer(modifier = Modifier.height(20.dp))
+
+                val adminNumber = "03286029100"
+
                 PaymentOption(
                     label = stringResource(R.string.jazzcash), 
-                    subtitle = "EasyPaisa / JazzCash",
+                    subtitle = "Tap to open JazzCash App",
                     isSelected = selectedMethod == "JazzCash",
-                    onSelect = { selectedMethod = "JazzCash" }
+                    onSelect = { 
+                        selectedMethod = "JazzCash"
+                        val packageName = "com.techlogix.mobilinkcustomer"
+                        val launchIntent = activity.packageManager.getLaunchIntentForPackage(packageName)
+                        if (launchIntent != null) {
+                            activity.startActivity(launchIntent)
+                        } else {
+                            // Open Play Store if not installed
+                            try {
+                                activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")))
+                            } catch (e: Exception) {
+                                activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
+                            }
+                        }
+                    }
                 )
                 
                 PaymentOption(
                     label = stringResource(R.string.bank_card), 
-                    subtitle = "MasterCard / Visa",
+                    subtitle = "Secure Debit/Credit Card payment",
                     isSelected = selectedMethod == "Card",
-                    onSelect = { selectedMethod = "Card" }
+                    onSelect = { 
+                        selectedMethod = "Card"
+                        // Card logic can be added here later (e.g. Stripe or manual entry)
+                    }
                 )
                 
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Receipt Upload Section
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .border(1.dp, if(receiptUri != null) Color.Green else Color.DarkGray, RoundedCornerShape(12.dp))
+                        .clickable { receiptLauncher.launch("image/*") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (receiptUri != null) {
+                        AsyncImage(model = receiptUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Gold)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.upload_receipt), color = Gold)
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(32.dp))
                 Button(
                     onClick = {
+                        if (receiptUri == null) {
+                            Toast.makeText(activity, R.string.receipt_required, Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         showPaymentSheet = false
-                        startUploadProcess(isEdit, db, vehicleId, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, engineCondition, bodyCondition, interiorCondition, selectedDuration, currentUserName, currentUserProfilePic, remoteImages, selectedImages, auth, { isUploading = it }, onBack, true)
+                        // Process the receipt upload then call startUploadProcess
+                        isUploading = true
+                        MediaManager.get().upload(receiptUri)
+                            .option("folder", "receipts")
+                            .option("unsigned", true)
+                            .option("upload_preset", "wheelswap_preset")
+                            .callback(object : UploadCallback {
+                                override fun onStart(requestId: String?) {}
+                                override fun onSuccess(requestId: String?, resultData: Map<*, *>?) {
+                                    val receiptUrl = resultData?.get("secure_url") as? String ?: ""
+                                    startUploadProcess(isEdit, db, vehicleId, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, engineCondition, bodyCondition, interiorCondition, selectedDuration, currentUserName, currentUserProfilePic, remoteImages, selectedImages, auth, { isUploading = it }, onBack, true, receiptUrl)
+                                }
+                                override fun onError(requestId: String?, error: ErrorInfo?) {
+                                    isUploading = false
+                                    Toast.makeText(activity, "Receipt upload failed. Try again.", Toast.LENGTH_SHORT).show()
+                                }
+                                override fun onProgress(requestId: String?, bytes: Long, totalBytes: Long) {}
+                                override fun onReschedule(requestId: String?, error: ErrorInfo?) {}
+                            }).dispatch()
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    enabled = !isUploading
                 ) {
-                    Text(stringResource(R.string.pay_now), color = Color.White, fontWeight = FontWeight.Bold)
+                    if (isUploading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text(stringResource(R.string.pay_now), color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -477,7 +563,7 @@ fun startUploadProcess(
     engineCondition: Float, bodyCondition: Float, interiorCondition: Float,
     selectedDuration: String, currentUserName: String, currentUserProfilePic: String,
     remoteImages: List<String>, selectedImages: List<Uri>, auth: FirebaseAuth,
-    setUploading: (Boolean) -> Unit, onBack: () -> Unit, isPaid: Boolean
+    setUploading: (Boolean) -> Unit, onBack: () -> Unit, isPaid: Boolean, receiptUrl: String = ""
 ) {
     setUploading(true)
     val finalHealthScore = ((engineCondition + bodyCondition + interiorCondition) / 3).toInt()
@@ -493,7 +579,7 @@ fun startUploadProcess(
     if (isEdit) {
         val finalUrls = remoteImages.toMutableList()
         if (selectedImages.isEmpty()) {
-            updateFirestore(db, vehicleId, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, currentUserName, currentUserProfilePic, finalUrls, isPaid) {
+            updateFirestore(db, vehicleId, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, currentUserName, currentUserProfilePic, finalUrls, isPaid, receiptUrl) {
                 setUploading(false)
                 onBack()
             }
@@ -511,7 +597,7 @@ fun startUploadProcess(
                             if (url != null) finalUrls.add(url)
                             finishedCount++
                             if (finishedCount == selectedImages.size) {
-                                updateFirestore(db, vehicleId, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, currentUserName, currentUserProfilePic, finalUrls, isPaid) {
+                                updateFirestore(db, vehicleId, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, currentUserName, currentUserProfilePic, finalUrls, isPaid, receiptUrl) {
                                     setUploading(false)
                                     onBack()
                                 }
@@ -520,7 +606,7 @@ fun startUploadProcess(
                         override fun onError(requestId: String?, error: ErrorInfo?) {
                             finishedCount++
                             if (finishedCount == selectedImages.size) {
-                                updateFirestore(db, vehicleId, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, currentUserName, currentUserProfilePic, finalUrls, isPaid) {
+                                updateFirestore(db, vehicleId, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, currentUserName, currentUserProfilePic, finalUrls, isPaid, receiptUrl) {
                                     setUploading(false)
                                     onBack()
                                 }
@@ -534,7 +620,7 @@ fun startUploadProcess(
     } else {
         val uploadedUrls = mutableListOf<String>()
         if (selectedImages.isEmpty()) {
-            saveToFirestore(db, auth.currentUser?.uid ?: "", currentUserName, currentUserProfilePic, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, expiryTimestamp, emptyList(), isPaid) {
+            saveToFirestore(db, auth.currentUser?.uid ?: "", currentUserName, currentUserProfilePic, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, expiryTimestamp, emptyList(), isPaid, receiptUrl) {
                 setUploading(false)
                 onBack()
             }
@@ -552,7 +638,7 @@ fun startUploadProcess(
                             if (url != null) uploadedUrls.add(url)
                             finishedCount++
                             if (finishedCount == selectedImages.size) {
-                                saveToFirestore(db, auth.currentUser?.uid ?: "", currentUserName, currentUserProfilePic, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, expiryTimestamp, uploadedUrls, isPaid) {
+                                saveToFirestore(db, auth.currentUser?.uid ?: "", currentUserName, currentUserProfilePic, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, expiryTimestamp, uploadedUrls, isPaid, receiptUrl) {
                                     setUploading(false)
                                     onBack()
                                 }
@@ -561,7 +647,7 @@ fun startUploadProcess(
                         override fun onError(requestId: String?, error: ErrorInfo?) {
                             finishedCount++
                             if (finishedCount == selectedImages.size) {
-                                saveToFirestore(db, auth.currentUser?.uid ?: "", currentUserName, currentUserProfilePic, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, expiryTimestamp, uploadedUrls, isPaid) {
+                                saveToFirestore(db, auth.currentUser?.uid ?: "", currentUserName, currentUserProfilePic, name, price, location, km, year, type, fuelType, contact, modifications, isSwapAvailable, finalHealthScore, expiryTimestamp, uploadedUrls, isPaid, receiptUrl) {
                                     setUploading(false)
                                     onBack()
                                 }
@@ -580,7 +666,7 @@ fun saveToFirestore(
     name: String, price: String, location: String, km: String, 
     year: String, type: String, fuelType: String, contact: String, modifications: String,
     isSwapAvailable: Boolean, healthScore: Int, expiryTimestamp: Long, imageUrls: List<String>,
-    isPaid: Boolean, onComplete: () -> Unit
+    isPaid: Boolean, receiptUrl: String, onComplete: () -> Unit
 ) {
     val vehicle = hashMapOf(
         "userId" to userId, "sellerName" to sellerName, "sellerProfilePic" to sellerProfilePic,
@@ -588,6 +674,8 @@ fun saveToFirestore(
         "year" to year, "type" to type, "fuelType" to fuelType, "contact" to contact, "modifications" to modifications, 
         "isSwapAvailable" to isSwapAvailable, "healthScore" to healthScore, 
         "isPaid" to isPaid,
+        "receiptUrl" to receiptUrl,
+        "isVerified" to false, // Admin will change this to true after checking receipt
         "emoji" to (if (type == "Car") "🚗" else "🏍️"),
         "imageUrls" to imageUrls, "timestamp" to System.currentTimeMillis(),
         "expiryTimestamp" to expiryTimestamp,
@@ -600,7 +688,7 @@ fun updateFirestore(
     db: FirebaseFirestore, id: String, name: String, price: String, location: String, km: String,
     year: String, type: String, fuelType: String, contact: String, modifications: String,
     isSwapAvailable: Boolean, healthScore: Int, sellerName: String, sellerProfilePic: String,
-    imageUrls: List<String>, isPaid: Boolean, onComplete: () -> Unit
+    imageUrls: List<String>, isPaid: Boolean, receiptUrl: String, onComplete: () -> Unit
 ) {
     val updates = mapOf(
         "name" to name, "price" to price, "location" to location, "km" to km, "year" to year,
@@ -609,6 +697,8 @@ fun updateFirestore(
         "sellerName" to sellerName, "sellerProfilePic" to sellerProfilePic,
         "imageUrls" to imageUrls,
         "isPaid" to isPaid,
+        "receiptUrl" to receiptUrl,
+        "isVerified" to false,
         "emoji" to (if (type == "Car") "🚗" else "🏍️")
     )
     db.collection("listings").document(id).update(updates).addOnSuccessListener { onComplete() }

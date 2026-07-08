@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -61,10 +62,12 @@ class DetailScreen : ComponentActivity() {
         val modifications = intent.getStringExtra("modifications") ?: ""
         val sellerName = intent.getStringExtra("sellerName") ?: "User"
         val sellerProfilePic = intent.getStringExtra("sellerProfilePic") ?: ""
+        val sellerId = intent.getStringExtra("sellerId") ?: ""
+        val isVerified = intent.getBooleanExtra("isVerified", false)
         val imageUrls = intent.getStringArrayListExtra("imageUrls") ?: arrayListOf()
 
         setContent {
-            DetailContent(id, name, price, location, km, year, emoji, type, contact, isSwapAvailable, healthScore, modifications, sellerName, sellerProfilePic, imageUrls)
+            DetailContent(id, name, price, location, km, year, emoji, type, contact, isSwapAvailable, healthScore, modifications, sellerName, sellerProfilePic, sellerId, isVerified, imageUrls)
         }
     }
 }
@@ -86,6 +89,8 @@ fun DetailContent(
     modifications: String,
     sellerName: String,
     sellerProfilePic: String,
+    sellerId: String,
+    isVerified: Boolean,
     imageUrls: List<String>
 ) {
     val context = LocalContext.current
@@ -101,8 +106,50 @@ fun DetailContent(
     var offeredKm by rememberSaveable { mutableStateOf("") }
     var offeredCondition by rememberSaveable { mutableStateOf("Good") }
     var offeredPhotoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var offeredImageUrl by rememberSaveable { mutableStateOf("") }
     
     var myVehiclePrice by rememberSaveable { mutableStateOf("") }
+
+    var showMyAdsDialog by remember { mutableStateOf(false) }
+    var myAds by remember { mutableStateOf(listOf<Vehicle>()) }
+
+    LaunchedEffect(showMyAdsDialog) {
+        if (showMyAdsDialog) {
+            val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+            if (currentUid != null) {
+                db.collection("listings")
+                    .whereEqualTo("userId", currentUid)
+                    .get()
+                    .addOnSuccessListener { snapshot ->
+                        myAds = snapshot.documents.mapNotNull { doc ->
+                            val vehicleType = doc.getString("type") ?: "Car"
+                            Vehicle(
+                                id = doc.id,
+                                name = doc.getString("name") ?: "",
+                                price = doc.getString("price") ?: "",
+                                location = doc.getString("location") ?: "",
+                                km = doc.getString("km") ?: "",
+                                type = vehicleType,
+                                emoji = doc.getString("emoji") ?: "🚗",
+                                year = doc.getString("year") ?: "",
+                                contact = doc.getString("contact") ?: "",
+                                userId = doc.getString("userId") ?: "",
+                                isSwapAvailable = doc.getBoolean("isSwapAvailable") ?: false,
+                                healthScore = doc.getLong("healthScore")?.toInt() ?: 0,
+                                modifications = doc.getString("modifications") ?: "",
+                                fuelType = doc.getString("fuelType") ?: (if (vehicleType == "Car") "Petrol" else ""),
+                                views = doc.getLong("views")?.toInt() ?: 0,
+                                isPaid = doc.getBoolean("isPaid") ?: false,
+                                sellerName = doc.getString("sellerName") ?: "User",
+                                sellerProfilePic = doc.getString("sellerProfilePic") ?: "",
+                                imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList(),
+                                expiryTimestamp = doc.getLong("expiryTimestamp") ?: 0L
+                            )
+                        }
+                    }
+            }
+        }
+    }
     
     // AI Valuation Feature for the main listing
     var aiValuationResult by remember { mutableStateOf<PricePrediction?>(null) }
@@ -134,43 +181,20 @@ fun DetailContent(
     ) { uri: Uri? -> offeredPhotoUri = uri }
 
     fun analyzeSwapVehicle() {
+        Toast.makeText(context, "This feature is under development. Coming soon!", Toast.LENGTH_SHORT).show()
+        /*
         if (offeredModel.isEmpty()) return
         isAnalyzingSwap = true
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            val prediction = predictPrice(
-                vehicleName = offeredModel,
-                year = offeredYear.filter { it.isDigit() }.toIntOrNull() ?: 2024,
-                mileageKm = offeredKm.filter { it.isDigit() }.toIntOrNull() ?: 0,
-                condition = offeredCondition,
-                selectedMods = emptyList()
-            )
-            swapPricePrediction = prediction
-            myVehiclePrice = prediction?.estimatedPrice?.toString() ?: "0"
-            isAnalyzingSwap = false
-        }, 1200)
+        ... original logic commented out ...
+        */
     }
 
     fun performListingValuation() {
+        Toast.makeText(context, "This feature is under development. Coming soon!", Toast.LENGTH_SHORT).show()
+        /*
         isValuatingListing = true
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            // Map health score to condition string for AI
-            val listingCondition = when {
-                healthScore >= 10 -> "Showroom"
-                healthScore >= 8 -> "Excellent"
-                healthScore >= 6 -> "Good"
-                healthScore >= 4 -> "Fair"
-                else -> "Poor"
-            }
-
-            aiValuationResult = predictPrice(
-                vehicleName = name,
-                year = year.filter { it.isDigit() }.toIntOrNull() ?: 2020,
-                mileageKm = km.filter { it.isDigit() }.toIntOrNull() ?: 0,
-                condition = listingCondition,
-                selectedMods = modifications.split(",").map { it.trim() }
-            )
-            isValuatingListing = false
-        }, 1500)
+        ... original logic commented out ...
+        */
     }
 
     val targetPriceNum = price.filter { it.isDigit() }.toLongOrNull() ?: 0L
@@ -240,6 +264,20 @@ fun DetailContent(
                 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                Button(
+                    onClick = { showMyAdsDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = CardBg),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Gold),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.List, contentDescription = null, tint = Gold)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Choose from your ads", color = Gold)
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
                 Text(stringResource(R.string.step_vehicle_type), color = Color.White, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                     listOf(
@@ -275,7 +313,9 @@ fun DetailContent(
                         .clickable { photoLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (offeredPhotoUri != null) {
+                    if (offeredImageUrl.isNotEmpty()) {
+                        AsyncImage(model = offeredImageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    } else if (offeredPhotoUri != null) {
                         AsyncImage(model = offeredPhotoUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -347,21 +387,15 @@ fun DetailContent(
                 // Step 4: Market Value Prediction
                 Button(
                     onClick = { analyzeSwapVehicle() },
-                    enabled = !isAnalyzingSwap && offeredModel.isNotEmpty(),
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f)),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    if (isAnalyzingSwap) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(stringResource(R.string.ai_analyzing), color = Color.White)
-                    } else {
-                        Text(stringResource(R.string.get_market_value), fontWeight = FontWeight.Bold)
-                    }
+                    Text(stringResource(R.string.get_market_value), fontWeight = FontWeight.Bold)
                 }
 
-                if (swapPricePrediction != null) {
+                if (false) { // Condition hidden
                     val prediction = swapPricePrediction!!
                     Spacer(modifier = Modifier.height(20.dp))
                     Surface(
@@ -418,11 +452,76 @@ fun DetailContent(
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(
                         onClick = {
-                            val message = "Assalam-o-Alaikum! I'm interested in a swap for your $name. I'm offering my $offeredYear $offeredModel ($offeredKm KM, $offeredCondition condition). Would you like to proceed?"
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                data = Uri.parse("https://api.whatsapp.com/send?phone=$contact&text=${Uri.encode(message)}")
+                            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+                            val buyerId = auth.currentUser?.uid ?: ""
+                            
+                            if (buyerId.isEmpty()) {
+                                Toast.makeText(context, "Please login to send proposal", Toast.LENGTH_SHORT).show()
+                                return@Button
                             }
-                            context.startActivity(intent)
+
+                            if (offeredModel.isEmpty()) {
+                                Toast.makeText(context, "Please enter vehicle model", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            // Fetch buyer details to include in proposal
+                            db.collection("users").document(buyerId).get().addOnSuccessListener { buyerDoc ->
+                                val bFirst = buyerDoc.getString("firstName") ?: ""
+                                val bLast = buyerDoc.getString("lastName") ?: ""
+                                val bPic = buyerDoc.getString("profileImageUrl") ?: ""
+                                val bContact = buyerDoc.getString("contact") ?: "" // Assuming user doc has contact
+
+                                val proposal = hashMapOf(
+                                    "listingId" to id,
+                                    "listingName" to name,
+                                    "sellerId" to sellerId,
+                                    "sellerName" to sellerName,
+                                    "sellerProfilePic" to sellerProfilePic,
+                                    "buyerId" to buyerId,
+                                    "buyerName" to "$bFirst $bLast".trim(),
+                                    "buyerProfilePic" to bPic,
+                                    "buyerContact" to bContact,
+                                    "vehicleModel" to offeredModel,
+                                    "vehicleYear" to offeredYear,
+                                    "vehicleKm" to offeredKm,
+                                    "vehicleCondition" to offeredCondition,
+                                    "vehicleImageUrl" to (if (offeredImageUrl.isNotEmpty()) offeredImageUrl else ""),
+                                    "timestamp" to System.currentTimeMillis(),
+                                    "status" to "Pending"
+                                )
+
+                                if (offeredPhotoUri != null && offeredImageUrl.isEmpty()) {
+                                    // Upload new photo first
+                                    com.cloudinary.android.MediaManager.get().upload(offeredPhotoUri)
+                                        .option("folder", "wheelswap")
+                                        .option("unsigned", true)
+                                        .option("upload_preset", "wheelswap_preset")
+                                        .callback(object : com.cloudinary.android.callback.UploadCallback {
+                                            override fun onStart(requestId: String?) {}
+                                            override fun onSuccess(requestId: String?, resultData: Map<*, *>?) {
+                                                proposal["vehicleImageUrl"] = resultData?.get("secure_url") as? String ?: ""
+                                                db.collection("proposals").add(proposal).addOnSuccessListener {
+                                                    Toast.makeText(context, "Proposal sent to seller!", Toast.LENGTH_LONG).show()
+                                                    showSwapDialog = false
+                                                }
+                                            }
+                                            override fun onError(requestId: String?, error: com.cloudinary.android.callback.ErrorInfo?) {
+                                                db.collection("proposals").add(proposal).addOnSuccessListener {
+                                                    Toast.makeText(context, "Proposal sent to seller!", Toast.LENGTH_LONG).show()
+                                                    showSwapDialog = false
+                                                }
+                                            }
+                                            override fun onProgress(requestId: String?, bytes: Long, totalBytes: Long) {}
+                                            override fun onReschedule(requestId: String?, error: com.cloudinary.android.callback.ErrorInfo?) {}
+                                        }).dispatch()
+                                } else {
+                                    db.collection("proposals").add(proposal).addOnSuccessListener {
+                                        Toast.makeText(context, "Proposal sent to seller!", Toast.LENGTH_LONG).show()
+                                        showSwapDialog = false
+                                    }
+                                }
+                            }
                         },
                         enabled = offeredModel.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -489,7 +588,18 @@ fun DetailContent(
 
         // NEW: Seller Info Section
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    if (sellerId.isNotEmpty()) {
+                        val intent = Intent(context, UserPublicProfileActivity::class.java).apply {
+                            putExtra("userId", sellerId)
+                            putExtra("userName", sellerName)
+                            putExtra("userPhoto", sellerProfilePic)
+                        }
+                        context.startActivity(intent)
+                    }
+                },
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -515,7 +625,11 @@ fun DetailContent(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(text = sellerName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "Verified Seller ✅", color = Color.Gray, fontSize = 12.sp)
+                    if (isVerified) {
+                        Text(text = "Verified Seller ✅", color = Color.Green.copy(alpha = 0.8f), fontSize = 12.sp)
+                    } else {
+                        Text(text = "Standard Seller", color = Color.Gray, fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -523,60 +637,19 @@ fun DetailContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         // AI Valuation Button/Card
-        if (aiValuationResult == null) {
-            Button(
-                onClick = { performListingValuation() },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(16.dp),
-                enabled = !isValuatingListing
-            ) {
-                if (isValuatingListing) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFFFFD700))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(stringResource(R.string.ai_analyzing), color = Color.White)
-                } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFFFD700))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(stringResource(R.string.unsatisfied_title), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(stringResource(R.string.unsatisfied_subtitle), color = Color.Gray, fontSize = 11.sp)
-                        }
-                    }
-                }
-            }
-        } else {
-            val prediction = aiValuationResult!!
-            Surface(
-                color = Color(0xFF1E1E1E),
-                shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(stringResource(R.string.ai_insight), color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(prediction.dealRating, fontSize = 10.sp)
-                        }
-                        Text(stringResource(R.string.fair_market_value, formatPrice(prediction.estimatedPrice)), 
-                            color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                        Text(
-                            text = stringResource(R.string.range_label, formatPrice(prediction.minPrice), formatPrice(prediction.maxPrice)),
-                            color = Color(0xFFFFD700),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    IconButton(onClick = { aiValuationResult = null }) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "Dismiss", tint = Color.Green)
-                    }
+        Button(
+            onClick = { performListingValuation() },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1E1E)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f)),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFFFD700))
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(stringResource(R.string.unsatisfied_title), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.unsatisfied_subtitle), color = Color.Gray, fontSize = 11.sp)
                 }
             }
         }
@@ -603,16 +676,35 @@ fun DetailContent(
         Spacer(modifier = Modifier.height(24.dp))
 
         // Action Buttons
-        Button(
-            onClick = {
-                val intent = Intent(Intent.ACTION_DIAL).apply { data = Uri.parse("tel:$contact") }
-                context.startActivity(intent)
-            },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(stringResource(R.string.contact_seller), color = Color(0xFF121212), fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = {
+                    val intent = Intent(Intent.ACTION_DIAL).apply { data = Uri.parse("tel:$contact") }
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.weight(1f).height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(stringResource(R.string.contact_seller), color = Color(0xFF121212), fontWeight = FontWeight.Bold)
+            }
+            
+            Button(
+                onClick = {
+                    val intent = Intent(context, ChatActivity::class.java).apply {
+                        putExtra("receiverId", sellerId)
+                        putExtra("receiverName", sellerName)
+                        putExtra("receiverPhoto", sellerProfilePic)
+                        putExtra("listingName", name)
+                    }
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.weight(1f).height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Chat 💬", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -667,6 +759,66 @@ fun DetailContent(
         }
         
         Spacer(modifier = Modifier.height(40.dp))
+    }
+
+    if (showMyAdsDialog) {
+        ModalBottomSheet(
+            onDismissRequest = { showMyAdsDialog = false },
+            containerColor = Color(0xFF1E1E1E),
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.Gray) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                Text("Your Active Listings", color = Gold, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (myAds.isEmpty()) {
+                    Text("No ads found. Please post a listing first.", color = Color.Gray)
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(myAds) { ad ->
+                            Card(
+                                modifier = Modifier
+                                    .width(200.dp)
+                                    .clickable {
+                                        offeredModel = ad.name
+                                        offeredYear = ad.year
+                                        offeredKm = ad.km
+                                        offeredType = ad.type
+                                        offeredCondition = "Excellent" // Default for posted ads
+                                        offeredImageUrl = ad.imageUrls.firstOrNull() ?: ""
+                                        showMyAdsDialog = false
+                                    },
+                                colors = CardDefaults.cardColors(containerColor = CardBg)
+                            ) {
+                                Column {
+                                    if (ad.imageUrls.isNotEmpty()) {
+                                        AsyncImage(
+                                            model = ad.imageUrls.first(),
+                                            contentDescription = null,
+                                            modifier = Modifier.height(100.dp).fillMaxWidth(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
+                                    Text(
+                                        text = ad.name,
+                                        modifier = Modifier.padding(8.dp),
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
     }
 
     if (showReportDialog) {

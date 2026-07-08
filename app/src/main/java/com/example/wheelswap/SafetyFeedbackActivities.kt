@@ -1,6 +1,7 @@
 package com.example.wheelswap
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -12,12 +13,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 // ── SAFETY TIPS ACTIVITY ──
 class SafetyTipsActivity : ComponentActivity() {
@@ -90,6 +95,10 @@ class FeedbackActivity : ComponentActivity() {
 @Composable
 fun FeedbackScreen(onBack: () -> Unit) {
     var feedbackText by remember { mutableStateOf("") }
+    var isSubmitting by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val db = FirebaseFirestore.getInstance()
+    val auth = FirebaseAuth.getInstance()
     
     Scaffold(
         containerColor = DarkBg,
@@ -113,15 +122,42 @@ fun FeedbackScreen(onBack: () -> Unit) {
                 onValueChange = { feedbackText = it },
                 modifier = Modifier.fillMaxWidth().height(200.dp),
                 placeholder = { Text(stringResource(R.string.feedback_placeholder), color = Color.Gray) },
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                enabled = !isSubmitting
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(
-                onClick = { onBack() },
+                onClick = {
+                    if (feedbackText.isBlank()) return@Button
+                    
+                    isSubmitting = true
+                    val user = auth.currentUser
+                    val feedbackData = hashMapOf(
+                        "userId" to (user?.uid ?: "Anonymous"),
+                        "userEmail" to (user?.email ?: "N/A"),
+                        "feedback" to feedbackText,
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                    
+                    db.collection("feedback").add(feedbackData)
+                        .addOnSuccessListener {
+                            Toast.makeText(context, "Feedback submitted! Thank you.", Toast.LENGTH_SHORT).show()
+                            onBack()
+                        }
+                        .addOnFailureListener {
+                            isSubmitting = false
+                            Toast.makeText(context, "Submission failed. Please try again.", Toast.LENGTH_SHORT).show()
+                        }
+                },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Gold)
+                colors = ButtonDefaults.buttonColors(containerColor = Gold),
+                enabled = !isSubmitting && feedbackText.isNotBlank()
             ) {
-                Text(stringResource(R.string.feedback_submit), color = DarkBg, fontWeight = FontWeight.Bold)
+                if (isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = DarkBg)
+                } else {
+                    Text(stringResource(R.string.feedback_submit), color = DarkBg, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
